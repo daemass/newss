@@ -1,9 +1,12 @@
+from flask import Flask, render_template_string
 import gspread
 from oauth2client.service_account import ServiceAccountCredentials
 from pytrends.request import TrendReq
 from googleapiclient.discovery import build
-from flask import Flask, render_template, request, jsonify
+from googletrans import Translator
 import requests
+from IPython.display import display, HTML, clear_output
+import ipywidgets as widgets
 import datetime
 import random
 import urllib.parse
@@ -286,10 +289,10 @@ def create_ui():
 
     display(tabs)
 
-@app.route("/")
+@app.route('/')
 def index():
     create_ui()
-    return output
+    return render_template_string('<!DOCTYPE html><html><body><div id="app">{{widgets_html}}</div></body></html>', widgets_html=output)
 
-if __name__ == "__main__":
-    app.run(host="0.0.0.0", port=5000)
+if __name__ == '__main__':
+    app.run(host='0.0.0.0', port=5000)
