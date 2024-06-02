@@ -1,16 +1,16 @@
+from flask import Flask, request, render_template_string
 import gspread
 from oauth2client.service_account import ServiceAccountCredentials
 from pytrends.request import TrendReq
 from googleapiclient.discovery import build
 from googletrans import Translator
 import requests
-from flask import Flask, request, render_template_string
+from IPython.display import display, HTML, clear_output
+import ipywidgets as widgets
 import datetime
 import random
 import urllib.parse
-from urllib.parse import quote_plus
-
-app = Flask(__name__)
+from urllib.parse import quote  # 수정된 부분
 
 # 네이버 API 설정
 naver_client_id = 'fIwplTzd5UFoMRvEkZIL'
@@ -114,11 +114,11 @@ def remove_like(platform, keyword, link):
 # 공유 기능 생성
 def create_share_links(title, link):
     share_links = {
-        "email": f"mailto:?subject={quote_plus(title)}&body={quote_plus(link)}",
-        "kakao": f"https://story.kakao.com/share?url={quote_plus(link)}",
-        "facebook": f"https://www.facebook.com/sharer/sharer.php?u={quote_plus(link)}",
-        "instagram": f"https://www.instagram.com/?url={quote_plus(link)}",
-        "twitter": f"https://twitter.com/intent/tweet?url={quote_plus(link)}&text={quote_plus(title)}"
+        "email": f"mailto:?subject={quote(title)}&body={quote(link)}",
+        "kakao": f"https://story.kakao.com/share?url={quote(link)}",
+        "facebook": f"https://www.facebook.com/sharer/sharer.php?u={quote(link)}",
+        "instagram": f"https://www.instagram.com/?url={quote(link)}",
+        "twitter": f"https://twitter.com/intent/tweet?url={quote(link)}&text={quote(title)}"
     }
     return share_links
 
@@ -288,10 +288,8 @@ def create_ui():
 
     display(tabs)
 
-@app.route('/')
-def index():
-    create_ui()
-    return render_template_string("<div id='notebook-container'></div>")
+# UI 생성
+create_ui()
 
 if __name__ == "__main__":
-    app.run(debug=True)
+    app.run(host='0.0.0.0', port=5000)
