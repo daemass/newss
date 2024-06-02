@@ -1,0 +1,12 @@
+version: '1.0'
+
+name: 'newsnow'
+
+services:
+  app:
+    build:
+      dockerfile: Dockerfile
+    environment:
+      - PORT=5000
+    ports:
+      - 5000
