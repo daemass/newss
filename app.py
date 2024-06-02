@@ -1,10 +1,8 @@
-pip install flask gspread oauth2client pytrends google-api-python-client googletrans==4.0.0-rc1 requests ipywidgets
-
-from flask import Flask, render_template, request, jsonify
 import gspread
 from oauth2client.service_account import ServiceAccountCredentials
 from pytrends.request import TrendReq
 from googleapiclient.discovery import build
+from flask import Flask, render_template, request, jsonify
 import requests
 import datetime
 import random
@@ -122,63 +120,176 @@ def create_share_links(title, link):
     }
     return share_links
 
-@app.route('/')
-def index():
-    return render_template('index.html')
-
-@app.route('/trends', methods=['GET'])
-def trends():
-    platform = request.args.get('platform')
-    if platform == 'naver':
-        news_items = search_naver_news("뉴스")
-        data = [{'title': item['title'], 'link': item['link'], 'pubDate': item['pubDate']} for item in news_items]
-    elif platform == 'google':
-        google_trends = get_google_trends()
-        data = [{'keyword': trend} for trend in google_trends]
-    elif platform == 'youtube':
-        youtube_trends = get_youtube_trends()
-        data = [{'title': title, 'video_id': video_id} for title, video_id in youtube_trends]
-    else:
-        data = []
-    return jsonify(data)
-
-@app.route('/like', methods=['POST'])
-def like():
-    data = request.get_json()
-    platform = data['platform']
-    keyword = data['keyword']
-    link = data['link']
-    save_like(platform, keyword, link)
-    return jsonify({'status': 'success'})
-
-@app.route('/unlike', methods=['POST'])
-def unlike():
-    data = request.get_json()
-    platform = data['platform']
-    keyword = data['keyword']
-    link = data['link']
-    remove_like(platform, keyword, link)
-    return jsonify({'status': 'success'})
-
-@app.route('/likes', methods=['GET'])
-def likes():
-    likes = likes_sheet.get_all_records()
-    data = [{'platform': like['Platform'], 'keyword': like['Keyword'], 'link': like['Link'], 'liked_time': like['Liked Time'], 'memo': like['Memo']} for like in likes]
-    return jsonify(data)
-
-@app.route('/search', methods=['GET'])
-def search():
-    query = request.args.get('query')
-    naver_news = search_naver_news(query)
-    google_news = search_naver_news(query)  # 네이버 뉴스 API를 사용하여 구글 뉴스 검색
-    youtube_videos = search_youtube(query)
+# 프론트엔드 UI 생성
+def create_ui():
+    output = widgets.Output()
     
-    data = {
-        'naver_news': [{'title': item['title'], 'link': item['link'], 'pubDate': item['pubDate']} for item in naver_news],
-        'google_news': [{'title': item['title'], 'link': item['link'], 'pubDate': item['pubDate']} for item in google_news],
-        'youtube_videos': [{'title': title, 'video_id': video_id} for title, video_id in youtube_videos]
-    }
-    return jsonify(data)
+    def show_naver_news():
+        with tabs.children[0]:
+            clear_output()
+            display(HTML("<h2>네이버 뉴스</h2>"))
+            news_items = search_naver_news("뉴스")
+            titles_seen = set()
+            for i, item in enumerate(news_items):
+                if item['title'] not in titles_seen:
+                    titles_seen.add(item['title'])
+                    share_links = create_share_links(item['title'], item['link'])
+                    like_checkbox = widgets.Checkbox(value=False, description='', indent=False, layout=widgets.Layout(width='20px'))
+                    like_checkbox.observe(lambda change, item=item: handle_like(change, "Naver News", item['title'], item['link']), names='value')
+                    display(widgets.HBox([widgets.HTML(f"<p>{i + 1}. <a href='{item['link']}' target='_blank'>{item['title']}</a> ({item['pubDate']})</p>"),
+                                          widgets.HTML(f"<a title='Email' href='{share_links['email']}' target='_blank'>📧</a> <a title='Kakao' href='{share_links['kakao']}' target='_blank'>🟧</a> <a title='Facebook' href='{share_links['facebook']}' target='_blank'>📘</a> <a title='Instagram' href='{share_links['instagram']}' target='_blank'>📸</a> <a title='Twitter' href='{share_links['twitter']}' target='_blank'>🐦</a>"),
+                                          like_checkbox]))
 
-if __name__ == '__main__':
-    app.run(host='0.0.0.0', port=5000)
+    def show_google_trends():
+        with tabs.children[1]:
+            clear_output()
+            display(HTML("<h2>구글 트렌드</h2>"))
+            google_trends = get_google_trends()
+            trends_box = widgets.VBox()
+            news_box = widgets.VBox()
+            display(widgets.HBox([widgets.VBox([trends_box], layout=widgets.Layout(width='20%')), widgets.VBox([news_box], layout=widgets.Layout(width='80%'))]))
+            for i, trend in enumerate(google_trends):
+                button = widgets.Button(description=f"{i + 1}. {trend}")
+                button.on_click(lambda x, trend=trend: show_news(trend, news_box))
+                trends_box.children += (button,)
+
+    def show_youtube_trends():
+        with tabs.children[2]:
+            clear_output()
+            display(HTML("<h2>유튜브 트렌드</h2>"))
+            youtube_trends = get_youtube_trends()
+            for i, (title, video_id) in enumerate(youtube_trends):
+                link = f"https://www.youtube.com/watch?v={video_id}"
+                share_links = create_share_links(title, link)
+                like_checkbox = widgets.Checkbox(value=False, description='', indent=False, layout=widgets.Layout(width='20px'))
+                like_checkbox.observe(lambda change, title=title, link=link: handle_like(change, "YouTube", title, link), names='value')
+                display(widgets.HBox([widgets.HTML(f"<p>{i + 1}. <a href='{link}' target='_blank'>{title}</a></p>"),
+                                      widgets.HTML(f"<a title='Email' href='{share_links['email']}' target='_blank'>📧</a> <a title='Kakao' href='{share_links['kakao']}' target='_blank'>🟧</a> <a title='Facebook' href='{share_links['facebook']}' target='_blank'>📘</a> <a title='Instagram' href='{share_links['instagram']}' target='_blank'>📸</a> <a title='Twitter' href='{share_links['twitter']}' target='_blank'>🐦</a>"),
+                                      like_checkbox]))
+
+    def show_news(keyword, news_box):
+        news_items = search_naver_news(keyword)
+        news_box.children = []
+        news_box.children += (widgets.HTML(f"<h2>{keyword} 관련 뉴스</h2>"),)
+        titles_seen = set()
+        for i, item in enumerate(news_items):
+            if item['title'] not in titles_seen:
+                titles_seen.add(item['title'])
+                share_links = create_share_links(item['title'], item['link'])
+                like_checkbox = widgets.Checkbox(value=False, description='', indent=False, layout=widgets.Layout(width='20px'))
+                like_checkbox.observe(lambda change, item=item: handle_like(change, "Google News", item['title'], item['link']), names='value')
+                news_box.children += (widgets.HBox([widgets.HTML(f"<p>{i + 1}. <a href='{item['link']}' target='_blank'>{item['title']}</a> ({item['pubDate']})</p>"),
+                                          widgets.HTML(f"<a title='Email' href='{share_links['email']}' target='_blank'>📧</a> <a title='Kakao' href='{share_links['kakao']}' target='_blank'>🟧</a> <a title='Facebook' href='{share_links['facebook']}' target='_blank'>📘</a> <a title='Instagram' href='{share_links['instagram']}' target='_blank'>📸</a> <a title='Twitter' href='{share_links['twitter']}' target='_blank'>🐦</a>"),
+                                      like_checkbox]),)
+
+    def handle_like(change, platform, keyword, link):
+        if change['new']:
+            save_like(platform, keyword, link)
+        else:
+            remove_like(platform, keyword, link)
+
+    def show_likes(b):
+        with tabs.children[3]:
+            clear_output()
+            display(HTML("<h2>좋아요 리스트</h2>"))
+            likes = likes_sheet.get_all_records()
+            for i, like in enumerate(likes):
+                memo_input = widgets.Text(value=like['Memo'], description='메모:')
+                memo_input.on_submit(lambda text, like=like: save_memo(like, text.value))
+                remove_button = widgets.Button(description='취소', layout=widgets.Layout(width='60px'))
+                remove_button.on_click(lambda x, like=like: remove_like(like['Platform'], like['Keyword'], like['Link']))
+                share_links = create_share_links(like['Keyword'], like['Link'])
+                display(widgets.HBox([widgets.HTML(f"<p>{i + 1}. <a href='{like['Link']}' target='_blank'>{like['Keyword']}</a> ({like['Liked Time']})</p>"),
+                                      memo_input, remove_button,
+                                      widgets.HTML(f"<a title='Email' href='{share_links['email']}' target='_blank'>📧</a> <a title='Kakao' href='{share_links['kakao']}' target='_blank'>🟧</a> <a title='Facebook' href='{share_links['facebook']}' target='_blank'>📘</a> <a title='Instagram' href='{share_links['instagram']}' target='_blank'>📸</a> <a title='Twitter' href='{share_links['twitter']}' target='_blank'>🐦</a>")]))
+
+    def save_memo(like, memo):
+        likes = likes_sheet.get_all_records()
+        for i, row in enumerate(likes):
+            if row['Platform'] == like['Platform'] and row['Keyword'] == like['Keyword'] and row['Link'] == like['Link']:
+                likes_sheet.update_cell(i + 2, 5, memo)  # 첫 번째 행은 헤더이므로 +2
+                break
+
+    def search_keyword(b):
+        query = keyword_input.value
+        if query:
+            with tabs.children[4]:
+                clear_output()
+                display(widgets.HBox([keyword_input, search_button, reset_button]))
+                display(HTML(f"<h2>키워드 '{query}' 검색 결과</h2>"))
+                news_items = search_naver_news(query)
+                display(HTML("<h3>네이버 뉴스</h3>"))
+                titles_seen = set()
+                for i, item in enumerate(news_items):
+                    if item['title'] not in titles_seen:
+                        titles_seen.add(item['title'])
+                        share_links = create_share_links(item['title'], item['link'])
+                        like_checkbox = widgets.Checkbox(value=False, description='', indent=False, layout=widgets.Layout(width='20px'))
+                        like_checkbox.observe(lambda change, item=item: handle_like(change, "Naver News", item['title'], item['link']), names='value')
+                        display(widgets.HBox([widgets.HTML(f"<p>{i + 1}. <a href='{item['link']}' target='_blank'>{item['title']}</a> ({item['pubDate']})</p>"),
+                                              widgets.HTML(f"<a title='Email' href='{share_links['email']}' target='_blank'>📧</a> <a title='Kakao' href='{share_links['kakao']}' target='_blank'>🟧</a> <a title='Facebook' href='{share_links['facebook']}' target='_blank'>📘</a> <a title='Instagram' href='{share_links['instagram']}' target='_blank'>📸</a> <a title='Twitter' href='{share_links['twitter']}' target='_blank'>🐦</a>"),
+                                              like_checkbox]))
+                display(HTML("<h3>구글 뉴스</h3>"))
+                google_news_items = search_naver_news(query)  # 네이버 뉴스 API를 사용하여 구글 뉴스 검색
+                titles_seen = set()
+                for i, item in enumerate(google_news_items):
+                    if item['title'] not in titles_seen:
+                        titles_seen.add(item['title'])
+                        share_links = create_share_links(item['title'], item['link'])
+                        like_checkbox = widgets.Checkbox(value=False, description='', indent=False, layout=widgets.Layout(width='20px'))
+                        like_checkbox.observe(lambda change, item=item: handle_like(change, "Google News", item['title'], item['link']), names='value')
+                        display(widgets.HBox([widgets.HTML(f"<p>{i + 1}. <a href='{item['link']}' target='_blank'>{item['title']}</a> ({item['pubDate']})</p>"),
+                                              widgets.HTML(f"<a title='Email' href='{share_links['email']}' target='_blank'>📧</a> <a title='Kakao' href='{share_links['kakao']}' target='_blank'>🟧</a> <a title='Facebook' href='{share_links['facebook']}' target='_blank'>📘</a> <a title='Instagram' href='{share_links['instagram']}' target='_blank'>📸</a> <a title='Twitter' href='{share_links['twitter']}' target='_blank'>🐦</a>"),
+                                              like_checkbox]))
+                display(HTML("<h3>유튜브</h3>"))
+                youtube_items = search_youtube(query)  # 유튜브 전체 검색
+                for i, (title, video_id) in enumerate(youtube_items):
+                    link = f"https://www.youtube.com/watch?v={video_id}"
+                    share_links = create_share_links(title, link)
+                    like_checkbox = widgets.Checkbox(value=False, description='', indent=False, layout=widgets.Layout(width='20px'))
+                    like_checkbox.observe(lambda change, title=title, link=link: handle_like(change, "YouTube", title, link), names='value')
+                    display(widgets.HBox([widgets.HTML(f"<p>{i + 1}. <a href='{link}' target='_blank'>{title}</a></p>"),
+                                          widgets.HTML(f"<a title='Email' href='{share_links['email']}' target='_blank'>📧</a> <a title='Kakao' href='{share_links['kakao']}' target='_blank'>🟧</a> <a title='Facebook' href='{share_links['facebook']}' target='_blank'>📘</a> <a title='Instagram' href='{share_links['instagram']}' target='_blank'>📸</a> <a title='Twitter' href='{share_links['twitter']}' target='_blank'>🐦</a>"),
+                                          like_checkbox]))
+
+    def reset_search(b):
+        with tabs.children[4]:
+            clear_output()
+            display(widgets.HBox([keyword_input, search_button, reset_button]))
+            display(HTML("<h2>수동 키워드 검색 결과</h2>"))
+
+    tabs = widgets.Tab()
+    tab_contents = ['네이버 뉴스', '구글 트렌드', '유튜브 트렌드', '좋아요 리스트', '수동 키워드 검색']
+    tabs.children = [widgets.Output() for _ in tab_contents]
+    for i, title in enumerate(tab_contents):
+        tabs.set_title(i, title)
+
+    show_naver_news()
+    show_google_trends()
+    show_youtube_trends()
+    tabs.children[3].children = (output,)
+
+    keyword_input = widgets.Text(
+        value='',
+        placeholder='키워드를 입력하세요',
+        description='키워드:',
+        disabled=False
+    )
+    search_button = widgets.Button(description="수동 검색하기")
+    search_button.on_click(search_keyword)
+    reset_button = widgets.Button(description="초기화")
+    reset_button.on_click(reset_search)
+
+    with tabs.children[4]:
+        display(widgets.HBox([keyword_input, search_button, reset_button]))
+        display(HTML("<h2>수동 키워드 검색 결과</h2>"))
+
+    display(tabs)
+
+@app.route("/")
+def index():
+    create_ui()
+    return output
+
+if __name__ == "__main__":
+    app.run(host="0.0.0.0", port=5000)
