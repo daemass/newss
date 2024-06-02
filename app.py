@@ -1,15 +1,14 @@
-from flask import Flask, render_template_string
 import gspread
 from oauth2client.service_account import ServiceAccountCredentials
 from pytrends.request import TrendReq
 from googleapiclient.discovery import build
 from googletrans import Translator
 import requests
-from IPython.display import display, HTML, clear_output
-import ipywidgets as widgets
+from flask import Flask, request, render_template_string
 import datetime
 import random
 import urllib.parse
+from urllib.parse import quote_plus
 
 app = Flask(__name__)
 
@@ -115,11 +114,11 @@ def remove_like(platform, keyword, link):
 # 공유 기능 생성
 def create_share_links(title, link):
     share_links = {
-        "email": f"mailto:?subject={urllib.parse.quote(title)}&body={urllib.parse.quote(link)}",
-        "kakao": f"https://story.kakao.com/share?url={urllib.parse.quote(link)}",
-        "facebook": f"https://www.facebook.com/sharer/sharer.php?u={urllib.parse.quote(link)}",
-        "instagram": f"https://www.instagram.com/?url={urllib.parse.quote(link)}",
-        "twitter": f"https://twitter.com/intent/tweet?url={urllib.parse.quote(link)}&text={urllib.parse.quote(title)}"
+        "email": f"mailto:?subject={quote_plus(title)}&body={quote_plus(link)}",
+        "kakao": f"https://story.kakao.com/share?url={quote_plus(link)}",
+        "facebook": f"https://www.facebook.com/sharer/sharer.php?u={quote_plus(link)}",
+        "instagram": f"https://www.instagram.com/?url={quote_plus(link)}",
+        "twitter": f"https://twitter.com/intent/tweet?url={quote_plus(link)}&text={quote_plus(title)}"
     }
     return share_links
 
@@ -292,7 +291,7 @@ def create_ui():
 @app.route('/')
 def index():
     create_ui()
-    return render_template_string('<!DOCTYPE html><html><body><div id="app">{{widgets_html}}</div></body></html>', widgets_html=output)
+    return render_template_string("<div id='notebook-container'></div>")
 
-if __name__ == '__main__':
-    app.run(host='0.0.0.0', port=5000)
+if __name__ == "__main__":
+    app.run(debug=True)
