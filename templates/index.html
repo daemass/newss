@@ -1,0 +1,88 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>트렌드 및 뉴스</title>
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+</head>
+<body>
+    <h1>플랫폼별 상위 검색어 및 뉴스</h1>
+    <div id="naver-news">
+        <h2>네이버 뉴스</h2>
+        <ul id="naver-news-list"></ul>
+    </div>
+    <div id="google-trends">
+        <h2>구글 트렌드</h2>
+        <ul id="google-trends-list"></ul>
+    </div>
+    <div id="youtube-trends">
+        <h2>유튜브 트렌드</h2>
+        <ul id="youtube-trends-list"></ul>
+    </div>
+    <div id="likes">
+        <h2>좋아요 리스트</h2>
+        <ul id="likes-list"></ul>
+    </div>
+    <div id="search">
+        <h2>수동 키워드 검색</h2>
+        <input type="text" id="keyword" placeholder="키워드를 입력하세요">
+        <button id="search-button">수동 검색하기</button>
+        <ul id="search-results"></ul>
+    </div>
+    <script>
+        function loadTrends(platform, listId) {
+            $.get(`/trends?platform=${platform}`, function(data) {
+                const list = $(`#${listId}`);
+                list.empty();
+                data.forEach(item => {
+                    if (platform === 'naver') {
+                        list.append(`<li>${item.title} (<a href="${item.link}" target="_blank">보기</a>)</li>`);
+                    } else if (platform === 'google') {
+                        list.append(`<li>${item.keyword}</li>`);
+                    } else if (platform === 'youtube') {
+                        list.append(`<li>${item.title} (<a href="https://www.youtube.com/watch?v=${item.video_id}" target="_blank">보기</a>)</li>`);
+                    }
+                });
+            });
+        }
+
+        function loadLikes() {
+            $.get('/likes', function(data) {
+                const list = $('#likes-list');
+                list.empty();
+                data.forEach(item => {
+                    list.append(`<li>${item.keyword} (<a href="${item.link}" target="_blank">보기</a>)</li>`);
+                });
+            });
+        }
+
+        $(document).ready(function() {
+            loadTrends('naver', 'naver-news-list');
+            loadTrends('google', 'google-trends-list');
+            loadTrends('youtube', 'youtube-trends-list');
+            loadLikes();
+
+            $('#search-button').click(function() {
+                const keyword = $('#keyword').val();
+                $.get(`/search?query=${keyword}`, function(data) {
+                    const results = $('#search-results');
+                    results.empty();
+                    results.append('<h3>네이버 뉴스</h3>');
+                    data.naver_news.forEach(item => {
+                        results.append(`<li>${item.title} (<a href="${item.link}" target="_blank">보기</a>)</li>`);
+                    });
+                    results.append('<h3>구글 뉴스</h3>');
+                    data.google_news.forEach(item => {
+                        results.append(`<li>${item.title} (<a href="${item.link}" target="_blank">보기</a>)</li>`);
+                    });
+                    results.append('<h3>유튜브</h3>');
+                    data.youtube_videos.forEach(item => {
+                        results.append(`<li>${item.title} (<a href="https://www.youtube.com/watch?v=${item.video_id}" target="_blank">보기</a>)</li>`);
+                    });
+                });
+            });
+        });
+    </script>
+</body>
+</html>
