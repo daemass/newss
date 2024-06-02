@@ -20,7 +20,7 @@ naver_client_secret = 'uASismIH2F'
 youtube_api_key = 'AIzaSyBYcEUgvctn9iK6TvRzVj20K8mQXJyLNro'
 
 # Google Sheets 설정
-json_keyfile_name = 'able-scope-425002-p7-2f366111b4de.json'
+json_keyfile_name = '1.json'
 sheet_name = '검색 데이터'
 likes_sheet_name = '좋아요 데이터'
 
