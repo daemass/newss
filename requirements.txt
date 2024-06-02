@@ -1,6 +1,6 @@
-project_name/
-├── app.py
-├── templates/
-│   └── index.html
-├── requirements.txt
-└── able-scope-425002-p7-2f366111b4de.json
+Flask
+gspread
+oauth2client
+pytrends
+google-api-python-client
+requests
