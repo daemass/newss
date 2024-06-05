@@ -1,6 +1,7 @@
-Flask
 gspread
 oauth2client
 pytrends
 google-api-python-client
 requests
+ipython
+ipywidgets
